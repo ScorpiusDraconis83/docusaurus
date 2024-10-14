@@ -7,17 +7,21 @@
 
 import fs from 'fs-extra';
 import path from 'path';
-import MiniCssExtractPlugin from 'mini-css-extract-plugin';
-import {md5Hash, getFileLoaderUtils} from '@docusaurus/utils';
+import {getCustomBabelConfigFilePath} from '@docusaurus/babel';
 import {
+  getCSSExtractPlugin,
+  getMinimizers,
   createJsLoaderFactory,
-  getStyleLoaders,
-  getCustomBabelConfigFilePath,
-} from './utils';
-import {getMinimizers} from './minification';
+} from '@docusaurus/bundler';
+
+import {md5Hash, getFileLoaderUtils} from '@docusaurus/utils';
 import {loadThemeAliases, loadDocusaurusAliases} from './aliases';
 import type {Configuration} from 'webpack';
-import type {FasterConfig, Props} from '@docusaurus/types';
+import type {
+  ConfigureWebpackUtils,
+  FasterConfig,
+  Props,
+} from '@docusaurus/types';
 
 const CSS_REGEX = /\.css$/i;
 const CSS_MODULE_REGEX = /\.module\.css$/i;
@@ -58,11 +62,13 @@ export async function createBaseConfig({
   isServer,
   minify,
   faster,
+  configureWebpackUtils,
 }: {
   props: Props;
   isServer: boolean;
   minify: boolean;
   faster: FasterConfig;
+  configureWebpackUtils: ConfigureWebpackUtils;
 }): Promise<Configuration> {
   const {
     outDir,
@@ -88,10 +94,18 @@ export async function createBaseConfig({
 
   const createJsLoader = await createJsLoaderFactory({siteConfig});
 
-  return {
-    mode,
-    name,
-    cache: {
+  const CSSExtractPlugin = await getCSSExtractPlugin({
+    currentBundler: props.currentBundler,
+  });
+
+  function getCache(): Configuration['cache'] {
+    if (props.currentBundler.name === 'rspack') {
+      // TODO Rspack only supports memory cache (as of Sept 2024)
+      // TODO re-enable file persistent cache one Rspack supports it
+      //  See also https://rspack.dev/config/cache#cache
+      return undefined;
+    }
+    return {
       type: 'filesystem',
       // Can we share the same cache across locales?
       // Exploring that question at https://github.com/webpack/webpack/issues/13034
@@ -117,7 +131,13 @@ export async function createBaseConfig({
           siteConfigPath,
         ],
       },
-    },
+    };
+  }
+
+  return {
+    mode,
+    name,
+    cache: getCache(),
     output: {
       pathinfo: false,
       path: outDir,
@@ -135,7 +155,6 @@ export async function createBaseConfig({
     },
     devtool: isProd ? undefined : 'eval-cheap-module-source-map',
     resolve: {
-      unsafeCache: false, // Not enabled, does not seem to improve perf much
       extensions: ['.wasm', '.mjs', '.js', '.jsx', '.ts', '.tsx', '.json'],
       symlinks: true, // See https://github.com/facebook/docusaurus/issues/3272
       roots: [
@@ -174,7 +193,9 @@ export async function createBaseConfig({
       // Only minimize client bundle in production because server bundle is only
       // used for static site generation
       minimize: minimizeEnabled,
-      minimizer: minimizeEnabled ? await getMinimizers({faster}) : undefined,
+      minimizer: minimizeEnabled
+        ? await getMinimizers({faster, currentBundler: props.currentBundler})
+        : undefined,
       splitChunks: isServer
         ? false
         : {
@@ -224,7 +245,7 @@ export async function createBaseConfig({
         {
           test: CSS_REGEX,
           exclude: CSS_MODULE_REGEX,
-          use: getStyleLoaders(isServer, {
+          use: configureWebpackUtils.getStyleLoaders(isServer, {
             importLoaders: 1,
             sourceMap: !isProd,
           }),
@@ -233,7 +254,7 @@ export async function createBaseConfig({
         // using the extension .module.css
         {
           test: CSS_MODULE_REGEX,
-          use: getStyleLoaders(isServer, {
+          use: configureWebpackUtils.getStyleLoaders(isServer, {
             modules: {
               // Using the same CSS Module class pattern in dev/prod on purpose
               // See https://github.com/facebook/docusaurus/pull/10423
@@ -247,7 +268,7 @@ export async function createBaseConfig({
       ],
     },
     plugins: [
-      new MiniCssExtractPlugin({
+      new CSSExtractPlugin({
         filename: isProd
           ? 'assets/css/[name].[contenthash:8].css'
           : '[name].css',

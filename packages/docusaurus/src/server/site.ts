@@ -11,7 +11,9 @@ import {
   DEFAULT_BUILD_DIR_NAME,
   GENERATED_FILES_DIR_NAME,
 } from '@docusaurus/utils';
+import {PerfLogger} from '@docusaurus/logger';
 import combinePromises from 'combine-promises';
+import {getCurrentBundler} from '@docusaurus/bundler';
 import {loadSiteConfig} from './config';
 import {getAllClientModules} from './clientModules';
 import {loadPlugins, reloadPlugin} from './plugins/plugins';
@@ -22,7 +24,6 @@ import {
   loadSiteCodeTranslations,
   getPluginsDefaultCodeTranslations,
 } from './translations/translations';
-import {PerfLogger} from '../utils';
 import {generateSiteFiles} from './codegen/codegen';
 import {getRoutesPaths, handleDuplicateRoutes} from './routes';
 import {createSiteStorage} from './storage';
@@ -88,6 +89,10 @@ export async function loadContext(
     }),
   });
 
+  const currentBundler = await getCurrentBundler({
+    siteConfig: initialSiteConfig,
+  });
+
   const i18n = await loadI18n(initialSiteConfig, {locale});
 
   const baseUrl = localizePath({
@@ -126,6 +131,7 @@ export async function loadContext(
     baseUrl,
     i18n,
     codeTranslations,
+    currentBundler,
   };
 }
 
@@ -145,6 +151,7 @@ function createSiteProps(
     i18n,
     localizationDir,
     codeTranslations: siteCodeTranslations,
+    currentBundler,
   } = context;
 
   const {headTags, preBodyTags, postBodyTags} = loadHtmlTags({
@@ -181,6 +188,7 @@ function createSiteProps(
     preBodyTags,
     postBodyTags,
     codeTranslations,
+    currentBundler,
   };
 }
 

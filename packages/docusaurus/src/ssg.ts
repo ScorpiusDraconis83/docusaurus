@@ -11,11 +11,10 @@ import path from 'path';
 import _ from 'lodash';
 import evaluate from 'eval';
 import pMap from 'p-map';
-import {minify} from 'html-minifier-terser';
-import logger from '@docusaurus/logger';
-import {PerfLogger} from './utils';
+import logger, {PerfLogger} from '@docusaurus/logger';
 import {renderSSRTemplate} from './templates/templates';
 import type {AppRenderer, AppRenderResult, SiteCollectedData} from './common';
+import type {HtmlMinifier} from '@docusaurus/bundler';
 
 import type {Manifest} from 'react-loadable-ssr-addon-v5-slorber';
 import type {SSRTemplateCompiled} from './templates/templates';
@@ -111,17 +110,80 @@ function pathnameToFilename({
   return `${outputFileName}.html`;
 }
 
+export function printSSGWarnings(
+  results: {
+    pathname: string;
+    warnings: string[];
+  }[],
+): void {
+  // Escape hatch because SWC is quite aggressive to report errors
+  // See https://github.com/facebook/docusaurus/pull/10554
+  // See https://github.com/swc-project/swc/discussions/9616#discussioncomment-10846201
+  if (process.env.DOCUSAURUS_IGNORE_SSG_WARNINGS === 'true') {
+    return;
+  }
+
+  const ignoredWarnings: string[] = [
+    // TODO React/Docusaurus emit NULL chars, and minifier detects it
+    //  see https://github.com/facebook/docusaurus/issues/9985
+    'Unexpected null character',
+  ];
+
+  const keepWarning = (warning: string) => {
+    return !ignoredWarnings.some((iw) => warning.includes(iw));
+  };
+
+  const resultsWithWarnings = results
+    .map((result) => {
+      return {
+        ...result,
+        warnings: result.warnings.filter(keepWarning),
+      };
+    })
+    .filter((result) => result.warnings.length > 0);
+
+  if (resultsWithWarnings.length) {
+    const message = `Docusaurus static site generation process emitted warnings for ${
+      resultsWithWarnings.length
+    } path${resultsWithWarnings.length ? 's' : ''}
+This is non-critical and can be disabled with DOCUSAURUS_IGNORE_SSG_WARNINGS=true
+Troubleshooting guide: https://github.com/facebook/docusaurus/discussions/10580
+
+- ${resultsWithWarnings
+      .map(
+        (result) => `${logger.path(result.pathname)}:
+  - ${result.warnings.join('\n  - ')}
+`,
+      )
+      .join('\n- ')}`;
+
+    logger.warn(message);
+  }
+}
+
 export async function generateStaticFiles({
   pathnames,
   renderer,
   params,
+  htmlMinifier,
 }: {
   pathnames: string[];
   renderer: AppRenderer;
   params: SSGParams;
+  htmlMinifier: HtmlMinifier;
 }): Promise<{collectedData: SiteCollectedData}> {
-  type SSGSuccess = {pathname: string; error: null; result: AppRenderResult};
-  type SSGError = {pathname: string; error: Error; result: null};
+  type SSGSuccess = {
+    pathname: string;
+    error: null;
+    result: AppRenderResult;
+    warnings: string[];
+  };
+  type SSGError = {
+    pathname: string;
+    error: Error;
+    result: null;
+    warnings: string[];
+  };
   type SSGResult = SSGSuccess | SSGError;
 
   // Note that we catch all async errors on purpose
@@ -133,16 +195,29 @@ export async function generateStaticFiles({
         pathname,
         renderer,
         params,
+        htmlMinifier,
       }).then(
-        (result) => ({pathname, result, error: null}),
-        (error) => ({pathname, result: null, error: error as Error}),
+        (result) => ({
+          pathname,
+          result,
+          error: null,
+          warnings: result.warnings,
+        }),
+        (error) => ({
+          pathname,
+          result: null,
+          error: error as Error,
+          warnings: [],
+        }),
       ),
     {concurrency: Concurrency},
   );
 
+  printSSGWarnings(results);
+
   const [allSSGErrors, allSSGSuccesses] = _.partition(
     results,
-    (r): r is SSGError => !!r.error,
+    (result): result is SSGError => !!result.error,
   );
 
   if (allSSGErrors.length > 0) {
@@ -171,11 +246,13 @@ async function generateStaticFile({
   pathname,
   renderer,
   params,
+  htmlMinifier,
 }: {
   pathname: string;
   renderer: AppRenderer;
   params: SSGParams;
-}) {
+  htmlMinifier: HtmlMinifier;
+}): Promise<AppRenderResult & {warnings: string[]}> {
   try {
     // This only renders the app HTML
     const result = await renderer({
@@ -186,13 +263,17 @@ async function generateStaticFile({
       params,
       result,
     });
-    const content = await minifyHtml(fullPageHtml);
+    const minifierResult = await htmlMinifier.minify(fullPageHtml);
     await writeStaticFile({
       pathname,
-      content,
+      content: minifierResult.code,
       params,
     });
-    return result;
+    return {
+      ...result,
+      // As of today, only the html minifier can emit SSG warnings
+      warnings: minifierResult.warnings,
+    };
   } catch (errorUnknown) {
     const error = errorUnknown as Error;
     const tips = getSSGErrorTips(error);
@@ -262,24 +343,4 @@ async function writeStaticFile({
   const filePath = path.join(params.outDir, filename);
   await fs.ensureDir(path.dirname(filePath));
   await fs.writeFile(filePath, content);
-}
-
-async function minifyHtml(html: string): Promise<string> {
-  try {
-    if (process.env.SKIP_HTML_MINIFICATION === 'true') {
-      return html;
-    }
-    // Minify html with https://github.com/DanielRuf/html-minifier-terser
-    return await minify(html, {
-      removeComments: false,
-      removeRedundantAttributes: true,
-      removeEmptyAttributes: true,
-      removeScriptTypeAttributes: true,
-      removeStyleLinkTypeAttributes: true,
-      useShortDoctype: true,
-      minifyJS: true,
-    });
-  } catch (err) {
-    throw new Error('HTML minification failed', {cause: err as Error});
-  }
 }

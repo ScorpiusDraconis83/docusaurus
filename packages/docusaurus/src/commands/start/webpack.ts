@@ -7,23 +7,19 @@
 
 import path from 'path';
 import merge from 'webpack-merge';
-import webpack from 'webpack';
+import {formatStatsErrorMessage, printStatsWarnings} from '@docusaurus/bundler';
 import logger from '@docusaurus/logger';
 import WebpackDevServer from 'webpack-dev-server';
 import evalSourceMapMiddleware from 'react-dev-utils/evalSourceMapMiddleware';
 import {createPollingOptions} from './watcher';
-import {
-  formatStatsErrorMessage,
-  getHttpsConfig,
-  printStatsWarnings,
-} from '../../webpack/utils';
+import getHttpsConfig from '../../webpack/utils/getHttpsConfig';
 import {
   createConfigureWebpackUtils,
   executePluginsConfigureWebpack,
 } from '../../webpack/configure';
 import {createStartClientConfig} from '../../webpack/client';
 import type {StartCLIOptions} from './start';
-import type {Props} from '@docusaurus/types';
+import type {ConfigureWebpackUtils, Props} from '@docusaurus/types';
 import type {Compiler} from 'webpack';
 import type {OpenUrlContext} from './utils';
 
@@ -127,23 +123,26 @@ async function getStartClientConfig({
   props,
   minify,
   poll,
+  configureWebpackUtils,
 }: {
   props: Props;
   minify: boolean;
   poll: number | boolean | undefined;
+  configureWebpackUtils: ConfigureWebpackUtils;
 }) {
-  const {plugins, siteConfig} = props;
+  const {plugins} = props;
   let {clientConfig: config} = await createStartClientConfig({
     props,
     minify,
     faster: props.siteConfig.future.experimental_faster,
     poll,
+    configureWebpackUtils,
   });
   config = executePluginsConfigureWebpack({
     plugins,
     config,
     isServer: false,
-    utils: await createConfigureWebpackUtils({siteConfig}),
+    configureWebpackUtils,
   });
   return config;
 }
@@ -157,13 +156,18 @@ export async function createWebpackDevServer({
   cliOptions: StartCLIOptions;
   openUrlContext: OpenUrlContext;
 }): Promise<WebpackDevServer> {
+  const configureWebpackUtils = await createConfigureWebpackUtils({
+    siteConfig: props.siteConfig,
+  });
+
   const config = await getStartClientConfig({
     props,
     minify: cliOptions.minify ?? true,
     poll: cliOptions.poll,
+    configureWebpackUtils,
   });
 
-  const compiler = webpack(config);
+  const compiler = props.currentBundler.instance(config);
   registerWebpackE2ETestHook(compiler);
 
   const defaultDevServerConfig = await createDevServerConfig({

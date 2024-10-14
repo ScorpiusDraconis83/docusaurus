@@ -44,12 +44,20 @@ export const DEFAULT_STORAGE_CONFIG: StorageConfig = {
 export const DEFAULT_FASTER_CONFIG: FasterConfig = {
   swcJsLoader: false,
   swcJsMinimizer: false,
+  swcHtmlMinimizer: false,
+  lightningCssMinimizer: false,
+  mdxCrossCompilerCache: false,
+  rspackBundler: false,
 };
 
 // When using the "faster: true" shortcut
 export const DEFAULT_FASTER_CONFIG_TRUE: FasterConfig = {
   swcJsLoader: true,
   swcJsMinimizer: true,
+  swcHtmlMinimizer: true,
+  lightningCssMinimizer: true,
+  mdxCrossCompilerCache: true,
+  rspackBundler: true,
 };
 
 export const DEFAULT_FUTURE_CONFIG: FutureConfig = {
@@ -217,6 +225,16 @@ const FASTER_CONFIG_SCHEMA = Joi.alternatives()
       swcJsMinimizer: Joi.boolean().default(
         DEFAULT_FASTER_CONFIG.swcJsMinimizer,
       ),
+      swcHtmlMinimizer: Joi.boolean().default(
+        DEFAULT_FASTER_CONFIG.swcHtmlMinimizer,
+      ),
+      lightningCssMinimizer: Joi.boolean().default(
+        DEFAULT_FASTER_CONFIG.lightningCssMinimizer,
+      ),
+      mdxCrossCompilerCache: Joi.boolean().default(
+        DEFAULT_FASTER_CONFIG.mdxCrossCompilerCache,
+      ),
+      rspackBundler: Joi.boolean().default(DEFAULT_FASTER_CONFIG.rspackBundler),
     }),
     Joi.boolean()
       .required()

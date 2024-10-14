@@ -5,30 +5,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import fs from 'fs-extra';
 import logger from '@docusaurus/logger';
 import {escapePath, type WebpackCompilerName} from '@docusaurus/utils';
 import {getProcessor, type SimpleProcessorResult} from './processor';
 import {validateMDXFrontMatter} from './frontMatter';
 import preprocessor from './preprocessor';
-import type {Options} from './loader';
-
-/**
- * When this throws, it generally means that there's no metadata file associated
- * with this MDX document. It can happen when using MDX partials (usually
- * starting with _). That's why it's important to provide the `isMDXPartial`
- * function in config
- */
-export async function readMetadataPath(metadataPath: string): Promise<string> {
-  try {
-    return await fs.readFile(metadataPath, 'utf8');
-  } catch (error) {
-    throw new Error(
-      logger.interpolate`MDX loader can't read MDX metadata file path=${metadataPath}. Maybe the isMDXPartial option function was not provided?`,
-      {cause: error as Error},
-    );
-  }
-}
+import type {Options} from './options';
 
 /**
  * Converts assets an object with Webpack require calls code.
@@ -149,4 +131,21 @@ export async function compileToJSX({
       {cause: error},
     );
   }
+}
+
+// TODO Docusaurus v4, remove temporary polyfill when upgrading to Node 22+
+export interface PromiseWithResolvers<T> {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: any) => void;
+}
+// TODO Docusaurus v4, remove temporary polyfill when upgrading to Node 22+
+export function promiseWithResolvers<T>(): PromiseWithResolvers<T> {
+  // @ts-expect-error: it's fine
+  const out: PromiseWithResolvers<T> = {};
+  out.promise = new Promise((resolve, reject) => {
+    out.resolve = resolve;
+    out.reject = reject;
+  });
+  return out;
 }

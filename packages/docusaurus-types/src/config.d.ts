@@ -126,6 +126,10 @@ export type StorageConfig = {
 export type FasterConfig = {
   swcJsLoader: boolean;
   swcJsMinimizer: boolean;
+  swcHtmlMinimizer: boolean;
+  lightningCssMinimizer: boolean;
+  mdxCrossCompilerCache: boolean;
+  rspackBundler: boolean;
 };
 
 export type FutureConfig = {
