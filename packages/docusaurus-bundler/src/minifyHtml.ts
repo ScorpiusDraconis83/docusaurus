@@ -7,10 +7,11 @@
 
 import {minify as terserHtmlMinifier} from 'html-minifier-terser';
 import {importSwcHtmlMinifier} from './importFaster';
-import type {DocusaurusConfig} from '@docusaurus/types';
 
 // Historical env variable
 const SkipHtmlMinification = process.env.SKIP_HTML_MINIFICATION === 'true';
+
+export type HtmlMinifierType = 'swc' | 'terser';
 
 export type HtmlMinifierResult = {
   code: string;
@@ -25,24 +26,15 @@ const NoopMinifier: HtmlMinifier = {
   minify: async (html: string) => ({code: html, warnings: []}),
 };
 
-type SiteConfigSlice = {
-  future: {
-    experimental_faster: Pick<
-      DocusaurusConfig['future']['experimental_faster'],
-      'swcHtmlMinimizer'
-    >;
-  };
-};
-
 export async function getHtmlMinifier({
-  siteConfig,
+  type,
 }: {
-  siteConfig: SiteConfigSlice;
+  type: HtmlMinifierType;
 }): Promise<HtmlMinifier> {
   if (SkipHtmlMinification) {
     return NoopMinifier;
   }
-  if (siteConfig.future.experimental_faster.swcHtmlMinimizer) {
+  if (type === 'swc') {
     return getSwcMinifier();
   } else {
     return getTerserMinifier();
@@ -55,9 +47,13 @@ async function getTerserMinifier(): Promise<HtmlMinifier> {
     minify: async function minifyHtmlWithTerser(html) {
       try {
         const code = await terserHtmlMinifier(html, {
+          // When enabled => React hydration errors
           removeComments: false,
-          removeRedundantAttributes: true,
-          removeEmptyAttributes: true,
+          removeRedundantAttributes: false,
+          removeEmptyAttributes: false,
+          sortAttributes: false,
+          sortClassName: false,
+
           removeScriptTypeAttributes: true,
           removeStyleLinkTypeAttributes: true,
           useShortDoctype: true,
@@ -92,9 +88,13 @@ async function getSwcMinifier(): Promise<HtmlMinifier> {
           sortSpaceSeparatedAttributeValues: false,
           sortAttributes: false,
 
-          // @ts-expect-error: bad type https://github.com/swc-project/swc/pull/9615
-          removeRedundantAttributes: 'all',
-          removeEmptyAttributes: true,
+          // When enabled => hydration error for className={"yt-lite "}
+          normalizeAttributes: false,
+          // When enabled => hydration error for className=""
+          removeEmptyAttributes: false,
+          // When enabled => hydration error for <a target="_self">
+          removeRedundantAttributes: 'none',
+
           minifyJs: true,
           minifyJson: true,
           minifyCss: true,

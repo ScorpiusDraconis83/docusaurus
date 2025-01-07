@@ -12,12 +12,10 @@ import logger from '@docusaurus/logger';
 import shell from 'shelljs';
 import {hasSSHProtocol, buildSshUrl, buildHttpsUrl} from '@docusaurus/utils';
 import {loadContext, type LoadContextParams} from '../server/site';
-import {build} from './build';
+import {build} from './build/build';
 
-export type DeployCLIOptions = Pick<
-  LoadContextParams,
-  'config' | 'locale' | 'outDir'
-> & {
+export type DeployCLIOptions = Pick<LoadContextParams, 'config' | 'outDir'> & {
+  locale?: [string, ...string[]];
   skipBuild?: boolean;
   targetDir?: string;
 };

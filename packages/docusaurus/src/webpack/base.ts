@@ -35,14 +35,19 @@ const LibrariesToTranspileRegex = new RegExp(
   LibrariesToTranspile.map((libName) => `(node_modules/${libName})`).join('|'),
 );
 
-const ReactAliases: Record<string, string> = process.env
-  .DOCUSAURUS_NO_REACT_ALIASES
-  ? {}
-  : {
-      react: path.dirname(require.resolve('react/package.json')),
-      'react-dom': path.dirname(require.resolve('react-dom/package.json')),
-      '@mdx-js/react': path.dirname(require.resolve('@mdx-js/react')),
-    };
+function getReactAliases(siteDir: string): Record<string, string> {
+  // Escape hatch
+  if (process.env.DOCUSAURUS_NO_REACT_ALIASES) {
+    return {};
+  }
+  const resolveSitePkg = (id: string) =>
+    require.resolve(id, {paths: [siteDir]});
+  return {
+    react: path.dirname(resolveSitePkg('react/package.json')),
+    'react-dom': path.dirname(resolveSitePkg('react-dom/package.json')),
+    '@mdx-js/react': path.dirname(resolveSitePkg('@mdx-js/react')),
+  };
+}
 
 export function excludeJS(modulePath: string): boolean {
   // Always transpile client dir
@@ -134,10 +139,28 @@ export async function createBaseConfig({
     };
   }
 
+  function getExperiments(): Configuration['experiments'] {
+    if (props.currentBundler.name === 'rspack') {
+      return {
+        // This is mostly useful in dev
+        // See https://rspack.dev/config/experiments#experimentsincremental
+        // Produces warnings in production builds
+        // See https://github.com/web-infra-dev/rspack/pull/8311#issuecomment-2476014664
+        // We use the same integration as Rspress, with ability to disable
+        // See https://github.com/web-infra-dev/rspress/pull/1631
+        // See https://github.com/facebook/docusaurus/issues/10646
+        // @ts-expect-error: Rspack-only, not available in Webpack typedefs
+        incremental: !isProd && !process.env.DISABLE_RSPACK_INCREMENTAL,
+      };
+    }
+    return undefined;
+  }
+
   return {
     mode,
     name,
     cache: getCache(),
+    experiments: getExperiments(),
     output: {
       pathinfo: false,
       path: outDir,
@@ -168,7 +191,7 @@ export async function createBaseConfig({
         process.cwd(),
       ],
       alias: {
-        ...ReactAliases,
+        ...getReactAliases(siteDir),
         '@site': siteDir,
         '@generated': generatedFilesDir,
         ...(await loadDocusaurusAliases()),
@@ -228,9 +251,9 @@ export async function createBaseConfig({
     module: {
       rules: [
         fileLoaderUtils.rules.images(),
+        fileLoaderUtils.rules.svgs(),
         fileLoaderUtils.rules.fonts(),
         fileLoaderUtils.rules.media(),
-        fileLoaderUtils.rules.svg(),
         fileLoaderUtils.rules.otherAssets(),
         {
           test: /\.[jt]sx?$/i,

@@ -46,7 +46,13 @@ declare module '@docusaurus/plugin-content-blog' {
     | 'github'
     | 'linkedin'
     | 'stackoverflow'
-    | 'x';
+    | 'x'
+    | 'bluesky'
+    | 'instagram'
+    | 'threads'
+    | 'mastodon'
+    | 'youtube'
+    | 'twitch';
 
   /**
    * Social platforms of the author.
@@ -144,10 +150,18 @@ declare module '@docusaurus/plugin-content-blog' {
      */
     title?: string;
     /**
+     * Will be used for SEO page metadata and override BlogPostMetadata.title.
+     */
+    title_meta?: string;
+    /**
      * Will override the default excerpt.
      * @see {@link BlogPostMetadata.description}
      */
     description?: string;
+    /**
+     * Will override the default excerpt.
+     */
+    sidebar_label?: string;
     /**
      * Front matter tags, unnormalized.
      * @see {@link BlogPostMetadata.tags}
@@ -655,6 +669,7 @@ declare module '@docusaurus/plugin-content-blog' {
 }
 
 declare module '@theme/BlogPostPage' {
+  import type {ReactNode} from 'react';
   import type {
     BlogPostFrontMatter,
     BlogSidebar,
@@ -675,18 +690,23 @@ declare module '@theme/BlogPostPage' {
     readonly blogMetadata: BlogMetadata;
   }
 
-  export default function BlogPostPage(props: Props): JSX.Element;
+  export default function BlogPostPage(props: Props): ReactNode;
 }
 
 declare module '@theme/BlogPostPage/Metadata' {
-  export default function BlogPostPageMetadata(): JSX.Element;
+  import type {ReactNode} from 'react';
+
+  export default function BlogPostPageMetadata(): ReactNode;
 }
 
 declare module '@theme/BlogPostPage/StructuredData' {
-  export default function BlogPostStructuredData(): JSX.Element;
+  import type {ReactNode} from 'react';
+
+  export default function BlogPostStructuredData(): ReactNode;
 }
 
 declare module '@theme/BlogListPage' {
+  import type {ReactNode} from 'react';
   import type {Content} from '@theme/BlogPostPage';
   import type {
     BlogSidebar,
@@ -705,10 +725,11 @@ declare module '@theme/BlogListPage' {
     readonly items: readonly {readonly content: Content}[];
   }
 
-  export default function BlogListPage(props: Props): JSX.Element;
+  export default function BlogListPage(props: Props): ReactNode;
 }
 
 declare module '@theme/BlogListPage/StructuredData' {
+  import type {ReactNode} from 'react';
   import type {Content} from '@theme/BlogPostPage';
   import type {
     BlogSidebar,
@@ -727,10 +748,11 @@ declare module '@theme/BlogListPage/StructuredData' {
     readonly items: readonly {readonly content: Content}[];
   }
 
-  export default function BlogListPageStructuredData(props: Props): JSX.Element;
+  export default function BlogListPageStructuredData(props: Props): ReactNode;
 }
 
 declare module '@theme/BlogTagsListPage' {
+  import type {ReactNode} from 'react';
   import type {BlogSidebar} from '@docusaurus/plugin-content-blog';
   import type {TagsListItem} from '@docusaurus/utils';
 
@@ -741,10 +763,11 @@ declare module '@theme/BlogTagsListPage' {
     readonly tags: TagsListItem[];
   }
 
-  export default function BlogTagsListPage(props: Props): JSX.Element;
+  export default function BlogTagsListPage(props: Props): ReactNode;
 }
 
 declare module '@theme/Blog/Pages/BlogAuthorsListPage' {
+  import type {ReactNode} from 'react';
   import type {
     AuthorItemProp,
     BlogSidebar,
@@ -757,10 +780,11 @@ declare module '@theme/Blog/Pages/BlogAuthorsListPage' {
     readonly authors: AuthorItemProp[];
   }
 
-  export default function BlogAuthorsListPage(props: Props): JSX.Element;
+  export default function BlogAuthorsListPage(props: Props): ReactNode;
 }
 
 declare module '@theme/Blog/Pages/BlogAuthorsPostsPage' {
+  import type {ReactNode} from 'react';
   import type {Content} from '@theme/BlogPostPage';
   import type {
     AuthorItemProp,
@@ -782,10 +806,11 @@ declare module '@theme/Blog/Pages/BlogAuthorsPostsPage' {
     readonly items: readonly {readonly content: Content}[];
   }
 
-  export default function BlogAuthorsPostsPage(props: Props): JSX.Element;
+  export default function BlogAuthorsPostsPage(props: Props): ReactNode;
 }
 
 declare module '@theme/BlogTagsPostsPage' {
+  import type {ReactNode} from 'react';
   import type {Content} from '@theme/BlogPostPage';
   import type {
     BlogSidebar,
@@ -807,10 +832,11 @@ declare module '@theme/BlogTagsPostsPage' {
     readonly items: readonly {readonly content: Content}[];
   }
 
-  export default function BlogTagsPostsPage(props: Props): JSX.Element;
+  export default function BlogTagsPostsPage(props: Props): ReactNode;
 }
 
 declare module '@theme/BlogArchivePage' {
+  import type {ReactNode} from 'react';
   import type {Content} from '@theme/BlogPostPage';
 
   /** We may add extra metadata or prune some metadata from here */
@@ -824,5 +850,5 @@ declare module '@theme/BlogArchivePage' {
     };
   }
 
-  export default function BlogArchivePage(props: Props): JSX.Element;
+  export default function BlogArchivePage(props: Props): ReactNode;
 }

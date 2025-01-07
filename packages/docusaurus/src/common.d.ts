@@ -15,12 +15,19 @@ export type AppRenderResult = {
   collectedData: PageCollectedData;
 };
 
-export type AppRenderer = (params: {
-  pathname: string;
-}) => Promise<AppRenderResult>;
+export type AppRenderer = {
+  render: (params: {pathname: string}) => Promise<AppRenderResult>;
+
+  // It's important to shut down the app renderer
+  // Otherwise Node.js require cache leaks memory
+  shutdown: () => Promise<void>;
+};
 
 export type PageCollectedData = {
+  // TODO Docusaurus v4 refactor: helmet state is non-serializable
+  //  this makes it impossible to run SSG in a worker thread
   helmet: HelmetServerState;
+
   links: string[];
   anchors: string[];
   modules: string[];

@@ -62,14 +62,6 @@ export type TagType =
 // prettier-ignore
 const Users: User[] = [
   {
-    title: 'AgileTs',
-    description: 'Global State and Logic Framework for reactive Applications',
-    preview: require('./showcase/agilets.png'),
-    website: 'https://agile-ts.org/',
-    source: 'https://github.com/agile-ts/documentation',
-    tags: ['opensource', 'design'],
-  },
-  {
     title: 'AI-Speaker',
     description: 'Local, reliable, fast and private Audio and IoT gate.',
     preview: require('./showcase/aispeaker.png'),
@@ -1123,11 +1115,11 @@ const Users: User[] = [
   },
   {
     title: 'Prismatic',
-    description: 'An Integration Platform for B2B Software Companies',
+    description: 'The Embedded Integration Platform for B2B SaaS Teams',
     preview: require('./showcase/prismatic.png'),
     website: 'https://prismatic.io/docs/',
     source: null,
-    tags: ['product'],
+    tags: ['design', 'large', 'product'],
   },
   {
     title: 'Pyre',

@@ -9,7 +9,6 @@ import npm2yarn from '@docusaurus/remark-plugin-npm2yarn';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import configTabs from './src/remark/configTabs';
-import RsdoctorPlugin from './src/plugins/rsdoctor/RsdoctorPlugin';
 
 import versions from './versions.json';
 import VersionsArchived from './versionsArchived.json';
@@ -18,6 +17,7 @@ import {
   dogfoodingThemeInstances,
   dogfoodingRedirects,
   dogfoodingTransformFrontMatter,
+  isArgosBuild,
 } from './_dogfooding/dogfooding.config';
 
 import ConfigLocalized from './docusaurus.config.localized.json';
@@ -128,6 +128,8 @@ const baseUrl = process.env.BASE_URL ?? '/';
 const isI18nStaging = process.env.I18N_STAGING === 'true';
 
 const isVersioningDisabled = !!process.env.DISABLE_VERSIONING || isI18nStaging;
+
+const isRsdoctor = process.env.RSDOCTOR === 'true';
 
 /*
 const TwitterSvg =
@@ -259,7 +261,25 @@ export default async function createConfigAsync() {
     ],
     themes: ['live-codeblock', ...dogfoodingThemeInstances],
     plugins: [
-      RsdoctorPlugin,
+      isRsdoctor && [
+        'rsdoctor',
+        {
+          rsdoctorOptions: {
+            disableTOSUpload: true,
+            supports: {
+              // https://rsdoctor.dev/config/options/options#generatetilegraph
+              generateTileGraph: true,
+            },
+            linter: {
+              // See https://rsdoctor.dev/guide/usage/rule-config
+              rules: {
+                'ecma-version-check': 'off',
+                'duplicate-package': 'off',
+              },
+            },
+          },
+        },
+      ],
       [
         './src/plugins/changelog/index.js',
         {
@@ -326,6 +346,10 @@ export default async function createConfigAsync() {
             {
               from: ['/docs/resources', '/docs/next/resources'],
               to: '/community/resources',
+            },
+            {
+              from: '/docs/api/misc/docusaurus-init',
+              to: '/docs/api/misc/create-docusaurus',
             },
             ...dogfoodingRedirects,
           ],
@@ -519,11 +543,18 @@ export default async function createConfigAsync() {
               }
             : undefined,
           sitemap: {
-            // Note: /tests/docs already has noIndex: true
-            ignorePatterns: ['/tests/{blog,pages}/**'],
+            ignorePatterns: isArgosBuild
+              ? undefined
+              : // Note: /tests/docs already has noIndex: true
+                ['/tests/{blog,pages}/**'],
             lastmod: 'date',
             priority: null,
             changefreq: null,
+          },
+          svgr: {
+            svgrConfig: {
+              svgoConfig: undefined, // Use .svgo.config.js
+            },
           },
         } satisfies Preset.Options,
       ],
@@ -773,11 +804,12 @@ export default async function createConfigAsync() {
           },
           {
             title: 'Legal',
-            // Please don't remove the privacy and terms, it's a legal
-            // requirement.
+            className: 'footer-column-legal',
+            // Don't remove the privacy and terms, it's a legal requirement.
             items: [
               {
                 label: 'Privacy',
+                className: 'footer-item-privacy',
                 href: 'https://opensource.facebook.com/legal/privacy/',
               },
               {

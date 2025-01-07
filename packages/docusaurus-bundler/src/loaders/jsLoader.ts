@@ -6,7 +6,7 @@
  */
 
 import {getBabelOptions} from '@docusaurus/babel';
-import {importSwcJsLoaderFactory} from '../importFaster';
+import {importSwcLoader, importGetSwcLoaderOptions} from '../importFaster';
 import {getCurrentBundler} from '../currentBundler';
 import type {ConfigureWebpackUtils, DocusaurusConfig} from '@docusaurus/types';
 
@@ -20,24 +20,32 @@ const BabelJsLoaderFactory: ConfigureWebpackUtils['getJSLoader'] = ({
   };
 };
 
-const RspackJsLoaderFactory: ConfigureWebpackUtils['getJSLoader'] = () => {
-  return {
-    loader: 'builtin:swc-loader',
-    options: {
-      jsc: {
-        parser: {
-          syntax: 'typescript',
-          tsx: true,
-        },
-        transform: {
-          react: {
-            runtime: 'automatic',
-          },
-        },
-      },
-    },
+async function createSwcJsLoaderFactory(): Promise<
+  ConfigureWebpackUtils['getJSLoader']
+> {
+  const loader = await importSwcLoader();
+  const getOptions = await importGetSwcLoaderOptions();
+  return ({isServer}) => {
+    return {
+      loader,
+      options: getOptions({isServer}),
+    };
   };
-};
+}
+
+// Same as swcLoader, except we use the built-in SWC loader
+async function createRspackSwcJsLoaderFactory(): Promise<
+  ConfigureWebpackUtils['getJSLoader']
+> {
+  const loader = 'builtin:swc-loader';
+  const getOptions = await importGetSwcLoaderOptions();
+  return ({isServer}) => {
+    return {
+      loader,
+      options: getOptions({isServer}),
+    };
+  };
+}
 
 // Confusing: function that creates a function that creates actual js loaders
 // This is done on purpose because the js loader factory is a public API
@@ -54,29 +62,23 @@ export async function createJsLoaderFactory({
 }): Promise<ConfigureWebpackUtils['getJSLoader']> {
   const currentBundler = await getCurrentBundler({siteConfig});
   const isSWCLoader = siteConfig.future.experimental_faster.swcJsLoader;
-
-  if (currentBundler.name === 'rspack') {
-    if (!isSWCLoader) {
+  if (isSWCLoader) {
+    if (siteConfig.webpack?.jsLoader) {
       throw new Error(
-        'When using Rspack bundler, it is required to enable swcJsLoader too',
+        `You can't use siteConfig.webpack.jsLoader and siteConfig.future.experimental_faster.swcJsLoader at the same time.
+To avoid any configuration ambiguity, you must make an explicit choice:
+- If you want to use Docusaurus Faster and SWC (recommended), remove siteConfig.webpack.jsLoader
+- If you want to use a custom JS loader, use siteConfig.future.experimental_faster.swcJsLoader: false`,
       );
     }
-    return RspackJsLoaderFactory;
+    return currentBundler.name === 'rspack'
+      ? createRspackSwcJsLoaderFactory()
+      : createSwcJsLoaderFactory();
   }
+
   const jsLoader = siteConfig.webpack?.jsLoader ?? 'babel';
-  if (
-    jsLoader instanceof Function &&
-    siteConfig.future?.experimental_faster.swcJsLoader
-  ) {
-    throw new Error(
-      "You can't use a custom webpack.jsLoader and experimental_faster.swcJsLoader at the same time",
-    );
-  }
   if (jsLoader instanceof Function) {
     return ({isServer}) => jsLoader(isServer);
-  }
-  if (siteConfig.future?.experimental_faster.swcJsLoader) {
-    return importSwcJsLoaderFactory();
   }
   if (jsLoader === 'babel') {
     return BabelJsLoaderFactory;

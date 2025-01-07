@@ -21,10 +21,10 @@ import sizeOf from 'image-size';
 import logger from '@docusaurus/logger';
 import {assetRequireAttributeValue, transformNode} from '../utils';
 // @ts-expect-error: TODO see https://github.com/microsoft/TypeScript/issues/49721
-import type {Transformer} from 'unified';
+import type {Plugin, Transformer} from 'unified';
 // @ts-expect-error: TODO see https://github.com/microsoft/TypeScript/issues/49721
 import type {MdxJsxTextElement} from 'mdast-util-mdx';
-import type {Image} from 'mdast';
+import type {Image, Root} from 'mdast';
 import type {Parent} from 'unist';
 
 type PluginOptions = {
@@ -98,6 +98,7 @@ async function toImageRequireNode(
       });
     }
   } catch (err) {
+    console.error(err);
     // Workaround for https://github.com/yarnpkg/berry/pull/3889#issuecomment-1034469784
     // TODO remove this check once fixed in Yarn PnP
     if (!process.versions.pnp) {
@@ -152,10 +153,7 @@ async function getImageAbsolutePath(
     return imageFilePath;
   }
   // relative paths are resolved against the source file's folder
-  const imageFilePath = path.join(
-    path.dirname(filePath),
-    decodeURIComponent(imagePath),
-  );
+  const imageFilePath = path.join(path.dirname(filePath), imagePath);
   await ensureImageFileExist(imageFilePath, filePath);
   return imageFilePath;
 }
@@ -180,13 +178,20 @@ async function processImageNode(target: Target, context: Context) {
     return;
   }
 
+  // We decode it first because Node Url.pathname is always encoded
+  // while the image file-system path are not.
+  // See https://github.com/facebook/docusaurus/discussions/10720
+  const decodedPathname = decodeURIComponent(parsedUrl.pathname);
+
   // We try to convert image urls without protocol to images with require calls
   // going through webpack ensures that image assets exist at build time
-  const imagePath = await getImageAbsolutePath(parsedUrl.pathname, context);
+  const imagePath = await getImageAbsolutePath(decodedPathname, context);
   await toImageRequireNode(target, imagePath, context);
 }
 
-export default function plugin(options: PluginOptions): Transformer {
+const plugin: Plugin<PluginOptions[], Root> = function plugin(
+  options,
+): Transformer<Root> {
   return async (root, vfile) => {
     const {visit} = await import('unist-util-visit');
 
@@ -201,9 +206,14 @@ export default function plugin(options: PluginOptions): Transformer {
     };
 
     const promises: Promise<void>[] = [];
-    visit(root, 'image', (node: Image, index, parent) => {
+    visit(root, 'image', (node, index, parent) => {
+      if (!parent || index === undefined) {
+        return;
+      }
       promises.push(processImageNode([node, index, parent!], context));
     });
     await Promise.all(promises);
   };
-}
+};
+
+export default plugin;
